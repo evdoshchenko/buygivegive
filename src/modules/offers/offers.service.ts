@@ -25,9 +25,11 @@ export class OffersService {
     if (user.id === wish.owner.id) throw new BadRequestException();
     if (money > wish.price) throw new BadRequestException();
 
-    await this.wishesService.update(createOfferDto.itemId, {
-      raised: money,
-    } as UpdateWishDto);
+    await this.wishesService.update(
+      createOfferDto.itemId,
+      { raised: money } as UpdateWishDto,
+      user,
+    );
 
     return this.offerRepository.save({ ...createOfferDto, user, item: wish });
   }

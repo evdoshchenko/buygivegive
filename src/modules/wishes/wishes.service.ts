@@ -7,16 +7,19 @@ import { Wish } from './entities/wish.entity';
 import { UsersService } from '../users/users.service';
 import { UpdateWishDto } from './dto/update-wish.dto';
 import { User } from '../users/entities/user.entity';
+import { WishNotFoundException } from '../common/exception/wish-not-found.exception';
+import { WishAlreadyExistException } from '../common/exception/wish-already-exists.exception';
+import { WishNotOwnsException } from '../common/exception/wish-not-owns.exception';
 
 @Injectable()
 export class WishesService {
   constructor(
     @InjectRepository(Wish) private readonly wishRepository: Repository<Wish>,
-    private readonly userService: UsersService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(id: number, createWishDto: CreateWishDto) {
-    const user = await this.userService.findOneById(id);
+    const user = await this.usersService.findOneById(id);
     return this.wishRepository.save({
       ...createWishDto,
       owner: user,
@@ -48,10 +51,11 @@ export class WishesService {
     return wish;
   }
 
-  async update(wishId: number, updateWishDto: UpdateWishDto) {
+  async update(wishId: number, updateWishDto: UpdateWishDto, user: User) {
     const wish = await this.findOne(wishId);
     if (updateWishDto.price && wish.offers.length > 0)
       throw new BadRequestException();
+    if (user && wish.owner.id !== user.id) throw new WishNotOwnsException();
 
     await this.wishRepository.update(wishId, updateWishDto);
     return this.findOne(wishId);
@@ -67,13 +71,19 @@ export class WishesService {
   }
 
   async copy(id: number, user: User) {
-    const { copied, ...dataWish } = await this.findOne(id);
-    const owner = await this.userService.findOneById(user.id);
-    await this.wishRepository.update(id, { copied: copied + 1 });
-    return this.wishRepository.save({
-      ...dataWish,
-      owner,
-    });
+    const wish = await this.findOne(id);
+    if (!wish) throw new WishNotFoundException();
+    else if (wish.owner.id === user.id) throw new WishAlreadyExistException();
+    const copyWishDto = {
+      name: wish.name,
+      link: wish.link,
+      image: wish.image,
+      price: wish.price,
+      copied: wish.copied + 1,
+      description: wish.description,
+    };
+    const copyWish = await this.create(user.id, copyWishDto);
+    return copyWish;
   }
 
   findMany(giftsId: number[]) {
