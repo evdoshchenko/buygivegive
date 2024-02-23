@@ -7,6 +7,7 @@ import { User } from './entities/user.entity';
 import { UpdateUsersDto } from './dto/update-users.dto';
 import { FindUserDto } from './dto/find-user.dto';
 import { HashService } from '../hash/hash.service';
+import { UserAlreadyExistsException } from '../common/exception/user-already-exists.exception';
 
 @Injectable()
 export class UsersService {
@@ -32,7 +33,7 @@ export class UsersService {
       createUserDto.email,
     );
 
-    if (existUser) throw new BadRequestException();
+    if (existUser) throw new UserAlreadyExistsException();
 
     const { ...user } = await this.userRepository.save({
       username: createUserDto.username,
@@ -59,14 +60,15 @@ export class UsersService {
 
   async update(id: number, updateUsersDto: UpdateUsersDto) {
     const user = await this.findOneById(id);
-    if (updateUsersDto.username && updateUsersDto.username !== user.username) {
-      const isUsernameExist = await this.findOne(updateUsersDto.username);
-      if (isUsernameExist) throw new BadRequestException();
-    }
     if (updateUsersDto.email && updateUsersDto.email !== user.email) {
       const isEmailExist = await this.findOne(updateUsersDto.email);
-      if (isEmailExist) throw new BadRequestException();
+      if (isEmailExist) throw new UserAlreadyExistsException();
     }
+    if (updateUsersDto.username && updateUsersDto.username !== user.username) {
+      const isUsernameExist = await this.findOne(updateUsersDto.username);
+      if (isUsernameExist) throw new UserAlreadyExistsException();
+    }
+
     if (updateUsersDto.password) {
       updateUsersDto.password = this.hashService.getHash(
         updateUsersDto.password,
